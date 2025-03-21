@@ -81,7 +81,7 @@ class Block:
         self.size = BLOCK_SIZE
         self.color = color
         self.index = index
-        self.speed = 3  # 基本速度
+        self.speed = 6  # 基本速度
         # 斜め4方向のみに移動（ランダムな初期方向）
         angle = random.choice([45, 135, 225, 315])
         self.dx = self.speed * math.cos(math.radians(angle))
@@ -179,6 +179,8 @@ class Block:
     def draw(self, surface):
         pygame.draw.rect(surface, self.color, 
                          (self.x - self.size//2, self.y - self.size//2, self.size, self.size))
+        # シンプルな軌跡描画（1ピクセル）
+        pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), 3)
 
 def initialize_pygame():
     """Pygameの初期化を行う関数"""
@@ -204,6 +206,47 @@ def initialize_pygame():
         goal_sound = pygame.mixer.Sound(GOAL_SOUND_FILE) if os.path.exists(GOAL_SOUND_FILE) else None
         
         pygame_initialized = True
+
+def create_obstacles(margin):
+    """障害物の設定を生成する関数"""
+    obstacles = [
+        {
+            'type': 'horizontal_moving',
+            'position': (margin, 0),
+            'color': (255, 0, 0),
+            'velocity': (0, 5),
+            'move_range': (margin, margin + BOX_SIZE),
+            'thickness': 5,
+            'sound': 'assets/sounds/block_bounce.wav'
+        },
+        {
+            'type': 'vertical_oscillating',
+            'position': (margin + 20, margin + BOX_SIZE//2),
+            'color': (0, 0, 255),
+            'amplitude': 50,
+            'speed': 0.05,
+            'thickness': 5,
+            'sound': 'assets/sounds/metal_bounce.wav'
+        },
+        {
+            'type': 'horizontal_patrolling',
+            'position': (margin + BOX_SIZE//2, margin + BOX_SIZE - 20),
+            'color': (0, 255, 0),
+            'velocity': (2, 0),
+            'move_range': (margin + 50, margin + BOX_SIZE - 50),
+            'length': 100,
+            'thickness': 5,
+            'sound': 'assets/sounds/block_bounce.wav'
+        }
+    ]
+    return obstacles
+
+def setup_map():
+    """マップの基本設定を行う関数"""
+    margin = (WIDTH - BOX_SIZE) // 2
+    box_rect = pygame.Rect(margin, margin, BOX_SIZE, BOX_SIZE)
+    goal_rect = pygame.Rect(WIDTH//2 - 30, margin + BOX_SIZE - 20, 60, 20)
+    return margin, box_rect, goal_rect
 
 def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
     """メインゲームループ"""
@@ -256,22 +299,17 @@ def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
     game_start_time = time.time()
     win_time = None
     
-    # 壁の移動用の変数（複数の移動壁を追加）
+    # マップと障害物の初期化
+    margin, box_rect, goal_rect = setup_map()
+    obstacles = create_obstacles(margin)
     start_time = pygame.time.get_ticks()
     
-    # 上部移動壁
-    wall_started = False
-    moving_wall_y = None
-    
-    # 下部水平移動壁
-    moving_wall_x = margin + BOX_SIZE//2  # 初期位置中央
-    moving_wall_dx = 2  # 移動速度
-    moving_wall_length = 100  # 壁の長さ
-    
-    # 左側振動壁
-    oscillating_wall_y = margin + BOX_SIZE//2
-    oscillating_dy = 1.5
-    oscillating_phase = 0
+    # 障害物の状態管理用変数
+    obstacle_states = {
+        'horizontal_moving': {'active': False, 'start_time': 0},
+        'vertical_oscillating': {'phase': 0},
+        'horizontal_patrolling': {'x': margin + BOX_SIZE//2}
+    }
     
     while running:
         # 現在時間の取得
@@ -292,23 +330,68 @@ def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
         # 画面クリア
         screen.fill(BACKGROUND_COLOR)
         
-        # 移動する壁の処理（5秒後に開始）
+        # 複数の動く壁の処理
+        # 壁関連変数の初期化
+        moving_wall_length = 100  # 水平移動壁の長さ
+        moving_wall_x = margin + BOX_SIZE//2  # 水平移動壁の初期X位置
+        moving_wall_dx = 2  # 水平移動壁の速度
+        wall_started = False  # 上部移動壁の動作開始フラグ
+        oscillating_phase = 0  # 振動壁の位相
+        
+        # 上部移動壁（上から下へ）
         if elapsed_seconds >= WALL_START_TIME and not wall_started:
             wall_started = True
             wall_start_time = current_time
         
         if wall_started:
-            wall_elapsed = (current_time - wall_start_time) / 1000  # 壁が動き始めてからの時間
-            
+            wall_elapsed = (current_time - wall_start_time) / 1000
             if wall_elapsed <= WALL_MOVE_DURATION:
-                # 壁の位置を計算（上から下へ）
-                progress = wall_elapsed / WALL_MOVE_DURATION  # 0～1の進行度
+                progress = wall_elapsed / WALL_MOVE_DURATION
                 moving_wall_y = margin + (BOX_SIZE * progress)
-                
-                # 移動する壁の描画
-                pygame.draw.line(screen, MOVING_WALL_COLOR, 
+                pygame.draw.line(screen, (255, 0, 0),  # 赤色に変更
                                (margin, moving_wall_y), 
-                               (margin + BOX_SIZE, moving_wall_y), 3)
+                               (margin + BOX_SIZE, moving_wall_y), 5)  # 太さを5に
+                
+                # 赤い壁との衝突判定
+                wall_rect = pygame.Rect(margin, moving_wall_y - 2, BOX_SIZE, 5)
+                for block in blocks:
+                    if block.rect.colliderect(wall_rect):
+                        block.dy = abs(block.dy)  # 下向きに反射
+                        if collision_sound:
+                            collision_sound.play()
+        
+        # 下部水平移動壁（左右に往復）
+        moving_wall_x += moving_wall_dx
+        if moving_wall_x < margin + 50 or moving_wall_x > margin + BOX_SIZE - 50:
+            moving_wall_dx *= -1
+        pygame.draw.line(screen, (0, 255, 0),  # 緑色
+                       (moving_wall_x - moving_wall_length//2, margin + BOX_SIZE - 20),
+                       (moving_wall_x + moving_wall_length//2, margin + BOX_SIZE - 20), 5)
+        
+        # 緑の壁との衝突判定
+        wall_rect = pygame.Rect(moving_wall_x - moving_wall_length//2, 
+                              margin + BOX_SIZE - 20 - 2, 
+                              moving_wall_length, 5)
+        for block in blocks:
+            if block.rect.colliderect(wall_rect):
+                block.dy = -abs(block.dy)  # 上向きに反射
+                if collision_sound:
+                    collision_sound.play()
+        
+        # 左側振動壁（正弦波状に上下）
+        oscillating_phase += 0.05
+        oscillating_wall_y = margin + BOX_SIZE//2 + 50 * math.sin(oscillating_phase)
+        pygame.draw.line(screen, (0, 0, 255),  # 青色
+                       (margin + 20, oscillating_wall_y - 50),
+                       (margin + 20, oscillating_wall_y + 50), 5)
+        
+        # 青い壁との衝突判定
+        wall_rect = pygame.Rect(margin + 20 - 2, oscillating_wall_y - 50, 5, 100)
+        for block in blocks:
+            if block.rect.colliderect(wall_rect):
+                block.dx = abs(block.dx)  # 右向きに反射
+                if collision_sound:
+                    collision_sound.play()
         
         # 通常の壁の描画（移動壁がある場合は上の壁は描画しない）
         if not wall_started or moving_wall_y is None:
