@@ -8,12 +8,25 @@ from pygame import mixer
 
 # 動画出力機能（オプション）
 VIDEO_EXPORT_ENABLED = False
+AUDIO_EXPORT_ENABLED = False
+
 try:
     import cv2
     import numpy as np
     from datetime import datetime
     VIDEO_EXPORT_ENABLED = True
     print("動画エクスポート機能が有効です")
+    
+    # FFmpeg機能の確認
+    try:
+        import subprocess
+        import tempfile
+        import os
+        import shutil
+        AUDIO_EXPORT_ENABLED = True
+        print("音声付き動画エクスポート機能が有効です")
+    except ImportError:
+        print("音声付き動画エクスポートができません。音声なしで出力します。")
 except ImportError:
     print("OpenCVのインポートに失敗しました。動画出力機能は無効になります。")
     print("動画出力を有効にするには、NumPy 1.xとOpenCVをインストールしてください。")
@@ -34,6 +47,16 @@ GOAL_COLOR = (255, 215, 0)  # ゴールは金色
 MOVING_WALL_COLOR = (255, 255, 255)  # 迫ってくる壁は白色
 WALL_START_TIME = 5  # 5秒後に壁が動き始める
 WALL_MOVE_DURATION = 25  # 壁が動く時間（秒）
+
+# ファイルパス定数
+# プロジェクトのルートディレクトリを基準とした相対パス
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))  # 現在のファイルのディレクトリ
+SOUND_DIR = os.path.join(ROOT_DIR, "assets", "sounds")
+BGM_DIR = os.path.join(ROOT_DIR, "assets", "bgm")
+VIDEO_DIR = os.path.join(ROOT_DIR, "videos")
+BGM_FILE = os.path.join(BGM_DIR, "famipop3.mp3")
+COLLISION_SOUND_FILE = os.path.join(SOUND_DIR, "collision.wav")
+GOAL_SOUND_FILE = os.path.join(SOUND_DIR, "goal.wav")
 
 # ブロックの色（拡張可能）
 BLOCK_COLORS = [
@@ -62,22 +85,12 @@ COLOR_NAMES = [
 DEFAULT_BLOCK_COUNT = 4  # ブロック数は4個固定
 DEFAULT_VIDEO_COUNT = 1  # デフォルトの動画生成数
 
-# Pygameの初期化
-pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("物理演算シミュレーション")
-clock = pygame.time.Clock()
-
-# 音楽の初期化
-mixer.init()
-if os.path.exists("physics_simulation/bgm.wav"):
-    mixer.music.load("physics_simulation/bgm.wav")
-    mixer.music.set_volume(0.5)
-    mixer.music.play(-1)  # -1はループ再生
-
-# サウンドエフェクト
-collision_sound = pygame.mixer.Sound("physics_simulation/collision.wav") if os.path.exists("physics_simulation/collision.wav") else None
-goal_sound = pygame.mixer.Sound("physics_simulation/goal.wav") if os.path.exists("physics_simulation/goal.wav") else None
+# グローバル変数
+pygame_initialized = False
+screen = None
+clock = None
+collision_sound = None
+goal_sound = None
 
 class Block:
     def __init__(self, x, y, color, index):
@@ -138,6 +151,7 @@ class Block:
             collision_occurred = True
         
         # 壁との衝突時に音を鳴らす
+        global collision_sound
         if collision_occurred and collision_sound:
             collision_sound.play()
         
@@ -171,6 +185,7 @@ class Block:
                     break
         
         # ゴールとの衝突判定
+        global goal_sound
         if self.rect.colliderect(goal_rect) and not self.reached_goal:
             self.reached_goal = True
             if goal_sound:
@@ -183,10 +198,42 @@ class Block:
         pygame.draw.rect(surface, self.color, 
                          (self.x - self.size//2, self.y - self.size//2, self.size, self.size))
 
+def initialize_pygame():
+    """Pygameの初期化を行う関数"""
+    global pygame_initialized, screen, clock, collision_sound, goal_sound
+    
+    if not pygame_initialized:
+        pygame.init()
+        mixer.init()
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("物理演算シミュレーション")
+        clock = pygame.time.Clock()
+        
+        # サウンドの初期化
+        if os.path.exists(BGM_FILE):
+            mixer.music.load(BGM_FILE)
+            mixer.music.set_volume(0.5)
+            mixer.music.play(-1)  # -1はループ再生
+        else:
+            print(f"BGM {BGM_FILE} が見つかりません")
+        
+        # 効果音の初期化
+        collision_sound = pygame.mixer.Sound(COLLISION_SOUND_FILE) if os.path.exists(COLLISION_SOUND_FILE) else None
+        goal_sound = pygame.mixer.Sound(GOAL_SOUND_FILE) if os.path.exists(GOAL_SOUND_FILE) else None
+        
+        pygame_initialized = True
+
 def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
+    """メインゲームループ"""
+    global screen, clock
+    
+    # Pygameの初期化
+    initialize_pygame()
+    
     # OpenCVがインポートできなかった場合は強制的に記録をオフに
     if not VIDEO_EXPORT_ENABLED:
         record = False
+    
     # 箱の設定
     margin = (WIDTH - BOX_SIZE) // 2
     box_rect = pygame.Rect(margin, margin, BOX_SIZE, BOX_SIZE)
@@ -199,8 +246,8 @@ def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
         try:
             # 現在時刻をファイル名に含める
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            video_filename = f"physics_simulation/simulation_{timestamp}.mp4"
-            os.makedirs("physics_simulation", exist_ok=True)
+            video_filename = f"{VIDEO_DIR}/simulation_{timestamp}.mp4"
+            os.makedirs(VIDEO_DIR, exist_ok=True)
         except Exception as e:
             print(f"動画設定エラー: {e}")
             record = False
@@ -233,7 +280,6 @@ def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
     moving_wall_y = None  # 移動する壁のY座標
     
     while running:
-        frame_start_time = time.time()
         # 現在時間の取得
         current_time = pygame.time.get_ticks()
         elapsed_seconds = (current_time - start_time) / 1000  # ミリ秒から秒に変換
@@ -334,26 +380,141 @@ def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
     # 動画の保存
     if record and frames:
         try:
-            print(f"動画を保存しています: {video_filename}")
+            # OpenCVで無音動画を作成
+            temp_video_path = video_filename
+            if AUDIO_EXPORT_ENABLED:
+                # 一時ファイル名を使用
+                temp_dir = tempfile.mkdtemp()
+                temp_video_path = os.path.join(temp_dir, "temp_video.mp4")
+                
+            print(f"動画を保存しています: {temp_video_path}")
             height, width = frames[0].shape[:2]
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video = cv2.VideoWriter(video_filename, fourcc, VIDEO_FPS, (width, height))
+            video = cv2.VideoWriter(temp_video_path, fourcc, VIDEO_FPS, (width, height))
             
             for frame in frames:
                 video.write(frame)
             
             video.release()
-            print(f"動画の保存が完了しました: {video_filename}")
+            
+            # 音声を追加（FFmpegが必要）
+            if AUDIO_EXPORT_ENABLED and os.path.exists(BGM_FILE):
+                print("FFmpegを使用して音声を追加しています...")
+                
+                # BGMをループさせて動画の長さに合わせる
+                # FFmpeg 2.8.4には-stream_loopオプションがないため、別の方法でループさせる
+                movie_duration = len(frames) / VIDEO_FPS
+                print(f"動画の長さ: {movie_duration}秒")
+                
+                # まずMP3をWAVに変換する（古いFFmpegでの互換性のため）
+                convert_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", BGM_FILE,
+                    "-c:a", "pcm_s16le",
+                    "-ar", "44100",
+                    f"{temp_dir}/original_bgm.wav"
+                ]
+                
+                try:
+                    subprocess.run(convert_cmd, check=True)
+                    print("BGMをWAVに変換しました")
+                    
+                    # 次にループ処理（古いバージョン対応）
+                    loop_cmd = [
+                        "ffmpeg", "-y",
+                        "-i", f"{temp_dir}/original_bgm.wav",
+                        "-filter_complex", f"aloop=loop=-1:size=2147483647",
+                        "-t", str(movie_duration),
+                        "-c:a", "pcm_s16le",
+                        "-ar", "44100",
+                        f"{temp_dir}/looped_bgm.wav"
+                    ]
+                    
+                    subprocess.run(loop_cmd, check=True)
+                    print("BGMをループして一時ファイルに保存しました")
+                except subprocess.CalledProcessError as e:
+                    print(f"BGMループ作成エラー: {e.stderr if hasattr(e, 'stderr') else e}")
+                
+                # 出力設定
+                if os.path.exists(f"{temp_dir}/looped_bgm.wav"):
+                    # ループしたBGMを使用（古いFFmpegに対応したコマンド）
+                    ffmpeg_cmd = [
+                        "ffmpeg", "-y",
+                        "-i", temp_video_path,
+                        "-i", f"{temp_dir}/looped_bgm.wav",
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-strict", "experimental",  # 古いFFmpeg用の設定
+                        "-map", "0:v",
+                        "-map", "1:a",
+                        "-b:a", "192k",  # ビットレートを指定
+                        "-ac", "2",      # ステレオ音声
+                        video_filename
+                    ]
+                else:
+                    # 変換とループに失敗した場合：直接BGMを使用
+                    print("BGMをループできませんでした。オリジナルのBGMを使用します。")
+                    ffmpeg_cmd = [
+                        "ffmpeg", "-y",
+                        "-i", temp_video_path,
+                        "-i", BGM_FILE,
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-strict", "experimental",  # 古いFFmpeg用の設定
+                        "-map", "0:v",
+                        "-map", "1:a",
+                        "-b:a", "192k",
+                        "-ac", "2",
+                        "-shortest",
+                        video_filename
+                    ]
+                
+                try:
+                    print("FFmpegコマンドを実行中:", " ".join(ffmpeg_cmd))
+                    result = subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+                    print(f"音声付き動画の保存が完了しました: {video_filename}")
+                    
+                    # 一時ファイルの削除
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+                except subprocess.CalledProcessError as e:
+                    print(f"FFmpegエラー: {e}")
+                    print(f"エラー出力: {e.stderr.decode('utf-8', errors='ignore') if hasattr(e, 'stderr') else '不明'}")
+                    print(f"音声なしで動画を保存します: {video_filename}")
+                    
+                    # より単純なコマンドで再試行
+                    try:
+                        simple_cmd = [
+                            "ffmpeg", "-y",
+                            "-i", temp_video_path,
+                            "-i", BGM_FILE,
+                            "-c:v", "copy",
+                            "-c:a", "aac",
+                            "-strict", "experimental",
+                            video_filename
+                        ]
+                        print("単純化したコマンドで再試行:", " ".join(simple_cmd))
+                        subprocess.run(simple_cmd, check=True)
+                        print("単純化したコマンドでの音声付き動画の作成に成功しました")
+                    except Exception as e2:
+                        print(f"再試行も失敗: {e2}")
+                        # 音声付加に失敗した場合は元の動画を使用
+                        if temp_video_path != video_filename:
+                            shutil.copy(temp_video_path, video_filename)
+                    
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+            else:
+                print(f"動画の保存が完了しました: {video_filename} (音声なし)")
         except Exception as e:
             print(f"動画保存エラー: {e}")
             video_filename = None
     
-    pygame.quit()
+    # メインループ終了後は、画面をクリアするだけで、Pygameは終了しない
+    screen.fill(BACKGROUND_COLOR)
+    pygame.display.flip()
     
-    if record and frames:
-        return video_filename
-    
-    sys.exit()
+    return video_filename
 
 def run_multiple_simulations(count, record=RECORD_VIDEO):
     """複数回シミュレーションを実行し、複数の動画を生成する関数"""
@@ -361,11 +522,17 @@ def run_multiple_simulations(count, record=RECORD_VIDEO):
     
     print(f"合計{count}個の動画を連続して生成します...")
     
+    # Pygameの初期化
+    initialize_pygame()
+    
     for i in range(count):
         print(f"\n=== 動画 {i+1}/{count} の生成を開始 ===")
         video_filename = main(record=record, block_count=DEFAULT_BLOCK_COUNT)
         if video_filename:
             video_files.append(video_filename)
+    
+    # すべての動画生成が終了したらPygameを終了
+    pygame.quit()
     
     print("\n=== 全ての動画生成が完了しました ===")
     if video_files:
@@ -386,12 +553,19 @@ if __name__ == "__main__":
                         help='動画出力を無効にする')
     args = parser.parse_args()
     
-    # 引数に基づいてシミュレーションを実行
-    if args.count > 1:
-        # 複数の動画を生成
-        video_files = run_multiple_simulations(args.count, record=not args.no_video)
-    else:
-        # 1つの動画を生成
-        video_filename = main(record=not args.no_video, block_count=DEFAULT_BLOCK_COUNT)
-        if video_filename:
-            print(f"YouTubeにアップロードできる動画が生成されました: {video_filename}")
+    try:
+        # 引数に基づいてシミュレーションを実行
+        if args.count > 1:
+            # 複数の動画を生成
+            video_files = run_multiple_simulations(args.count, record=not args.no_video)
+        else:
+            # 1つの動画を生成
+            initialize_pygame()
+            video_filename = main(record=not args.no_video, block_count=DEFAULT_BLOCK_COUNT)
+            pygame.quit()
+            if video_filename:
+                print(f"YouTubeにアップロードできる動画が生成されました: {video_filename}")
+    except Exception as e:
+        print(f"エラーが発生しました: {e}")
+        pygame.quit()
+        sys.exit(1)

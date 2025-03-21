@@ -25,10 +25,19 @@ def setup_environment():
     """環境を準備する関数"""
     print("物理演算シミュレーションの環境をセットアップしています...")
     
-    # physics_simulationフォルダが存在しない場合は作成
-    if not os.path.exists("physics_simulation"):
-        os.makedirs("physics_simulation")
-        print("physics_simulationフォルダを作成しました。")
+    # 必要なフォルダ構造を作成
+    folders = [
+        "physics_simulation",
+        "physics_simulation/assets",
+        "physics_simulation/assets/sounds",
+        "physics_simulation/assets/bgm",
+        "physics_simulation/videos"
+    ]
+    
+    for folder in folders:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+            print(f"{folder}フォルダを作成しました。")
     
     print("環境のセットアップが完了しました！")
 

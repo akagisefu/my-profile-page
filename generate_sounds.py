@@ -3,7 +3,10 @@ from scipy.io import wavfile
 import os
 
 # フォルダの作成
-os.makedirs("physics_simulation", exist_ok=True)
+SOUND_DIR = "physics_simulation/assets/sounds"
+BGM_DIR = "physics_simulation/assets/bgm"
+os.makedirs(SOUND_DIR, exist_ok=True)
+os.makedirs(BGM_DIR, exist_ok=True)
 
 def generate_collision_sound():
     """衝突音を生成する関数"""
@@ -22,8 +25,8 @@ def generate_collision_sound():
     note = (note * 32767).astype(np.int16)
     
     # ファイル保存
-    wavfile.write("physics_simulation/collision.wav", sample_rate, note)
-    print("衝突音を生成しました: physics_simulation/collision.wav")
+    wavfile.write(f"{SOUND_DIR}/collision.wav", sample_rate, note)
+    print(f"衝突音を生成しました: {SOUND_DIR}/collision.wav")
 
 def generate_goal_sound():
     """ゴール音を生成する関数"""
@@ -43,11 +46,14 @@ def generate_goal_sound():
     note = (note * 32767).astype(np.int16)
     
     # ファイル保存
-    wavfile.write("physics_simulation/goal.wav", sample_rate, note)
-    print("ゴール音を生成しました: physics_simulation/goal.wav")
+    wavfile.write(f"{SOUND_DIR}/goal.wav", sample_rate, note)
+    print(f"ゴール音を生成しました: {SOUND_DIR}/goal.wav")
 
 def generate_bgm():
-    """簡単なBGMを生成する関数"""
+    """簡単なBGMを生成する関数（MP3ファイルがある場合は上書きされないようにする）"""
+    if os.path.exists(f"{BGM_DIR}/famipop3.mp3"):
+        print(f"BGMファイル {BGM_DIR}/famipop3.mp3 がすでに存在します。生成をスキップします。")
+        return
     sample_rate = 44100
     duration = 5.0  # 5秒間のループ
     t = np.linspace(0, duration, int(sample_rate * duration), False)
@@ -83,10 +89,10 @@ def generate_bgm():
     audio = (audio * 32767).astype(np.int16)
     
     # ファイル保存（WAV形式）
-    wavfile.write("physics_simulation/bgm.wav", sample_rate, audio)
-    print("BGMを生成しました: physics_simulation/bgm.wav")
+    wavfile.write(f"{SOUND_DIR}/bgm.wav", sample_rate, audio)
+    print(f"BGM(WAV)を生成しました: {SOUND_DIR}/bgm.wav")
     print("注意: MP3形式に変換するには追加のライブラリが必要です。現在はWAV形式で保存しています。")
-    print("main.pyを編集して、BGMのファイル名を'bgm.wav'に変更してください。")
+    print("famipop3.mp3がある場合はそちらが優先して使用されます。")
 
 if __name__ == "__main__":
     generate_collision_sound()

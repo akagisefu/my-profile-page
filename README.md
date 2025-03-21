@@ -11,16 +11,31 @@
 - ブロック同士も衝突して反射
 - 5秒後から、ゴールの反対側から白い壁がゆっくり迫ってくる（25秒かけて）
 - ゴールに最初に到達した色が勝利
-- BGMと効果音付き
+- BGM(famipop3)と効果音付き
 - リセット機能（Rキー）
 - 動画エクスポート機能（YouTubeなどにアップロード可能）
+
+## フォルダ構成
+
+```
+physics_simulation/
+├── assets/          # アセットファイル
+│   ├── bgm/         # BGMファイル (famipop3.mp3)
+│   └── sounds/      # 効果音ファイル (collision.wav, goal.wav)
+├── videos/          # 生成された動画ファイル
+├── main.py          # メインスクリプト
+├── generate_sounds.py # 効果音生成スクリプト
+├── setup.py         # セットアップスクリプト
+└── README.md        # このファイル
+```
 
 ## 必要環境
 
 - Python 3.6以上
 - pygame
 - numpy
-- scipy
+- opencv-python (動画出力用)
+- ffmpeg (音声付き動画出力用)
 
 ## セットアップと実行方法
 
@@ -33,7 +48,7 @@ python physics_simulation/setup.py
 ```
 
 このスクリプトは以下の作業を行います：
-- 必要なパッケージ（pygame, numpy, scipy）のインストール
+- 必要なパッケージ（pygame, numpy, opencv-python）のインストール
 - サウンドファイルの生成
 
 ### 実行方法
@@ -74,15 +89,13 @@ python physics_simulation/main.py --no-video  # 動画出力を無効化
 8. 勝利すると、勝ったブロックの色で「Red Win!」「Green Win!」などと表示されます
 9. 勝利後5秒経過、または最大2分経過すると自動的に終了し、動画ファイルが保存されます
 
-## ファイル構成
+## 生成される動画ファイル
 
-- `main.py`: メインのシミュレーションプログラム
-- `generate_sounds.py`: BGMと効果音を生成するスクリプト
-- `setup.py`: 環境セットアップ用スクリプト
-- `bgm.wav`: 自動生成されたBGM
-- `collision.wav`: 壁との衝突音
-- `goal.wav`: ゴール到達時の効果音
-- `simulation_YYYYMMDD_HHMMSS.mp4`: 自動生成される動画ファイル
+- 動画は `videos` フォルダに保存されます
+- ファイル名: `simulation_YYYYMMDD_HHMMSS.mp4`
+- 形式: MP4 (H.264 エンコード)
+- BGM: famipop3.mp3（ループ再生）
+- 効果音: 衝突音、ゴール到達音
 
 ## カスタマイズ
 
