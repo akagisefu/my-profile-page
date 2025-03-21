@@ -27,8 +27,18 @@ ENV/
 # 生成された動画ファイル
 simulation_*.mp4
 
-# サウンドファイル（必要に応じてコメントアウト）
-# *.wav
+# ローカル設定ファイル
+config.py
+
+# サウンドファイル
+*.wav
+
+# IDE関連
+.vscode/
+.idea/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
 
 # OSの生成ファイル
 .DS_Store

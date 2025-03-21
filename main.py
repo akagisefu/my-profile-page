@@ -31,22 +31,24 @@ except ImportError:
     print("OpenCVのインポートに失敗しました。動画出力機能は無効になります。")
     print("動画出力を有効にするには、NumPy 1.xとOpenCVをインストールしてください。")
 
-# 定数
-WIDTH, HEIGHT = 800, 800
-# 動画出力用定数
-RECORD_VIDEO = VIDEO_EXPORT_ENABLED  # OpenCVがインポートできた場合のみTrue
-MAX_GAME_TIME = 120  # 最大ゲーム時間（秒）
-WIN_DISPLAY_TIME = 5  # 勝利後の表示時間（秒）
-VIDEO_FPS = 30  # 出力動画のFPS
-BOX_SIZE = 700
-BLOCK_SIZE = 30
-FPS = 60
-BACKGROUND_COLOR = (0, 0, 0)
-BOX_COLOR = (50, 50, 50)
-GOAL_COLOR = (255, 215, 0)  # ゴールは金色
-MOVING_WALL_COLOR = (255, 255, 255)  # 迫ってくる壁は白色
-WALL_START_TIME = 5  # 5秒後に壁が動き始める
-WALL_MOVE_DURATION = 25  # 壁が動く時間（秒）
+# ゲーム設定のインポート
+from config import (
+    WIDTH,
+    HEIGHT,
+    RECORD_VIDEO,
+    MAX_GAME_TIME,
+    WIN_DISPLAY_TIME,
+    VIDEO_FPS,
+    BOX_SIZE,
+    BLOCK_SIZE,
+    FPS,
+    BACKGROUND_COLOR,
+    BOX_COLOR,
+    GOAL_COLOR,
+    MOVING_WALL_COLOR,
+    WALL_START_TIME,
+    WALL_MOVE_DURATION
+)
 
 # ファイルパス定数
 # プロジェクトのルートディレクトリを基準とした相対パス
@@ -58,28 +60,8 @@ BGM_FILE = os.path.join(BGM_DIR, "famipop3.mp3")
 COLLISION_SOUND_FILE = os.path.join(SOUND_DIR, "collision.wav")
 GOAL_SOUND_FILE = os.path.join(SOUND_DIR, "goal.wav")
 
-# ブロックの色（拡張可能）
-BLOCK_COLORS = [
-    (255, 0, 0),    # 赤
-    (0, 255, 0),    # 緑
-    (0, 0, 255),    # 青
-    (255, 255, 0),  # 黄
-    (255, 0, 255),  # マゼンタ
-    (0, 255, 255),  # シアン
-    (255, 128, 0),  # オレンジ
-    (128, 0, 255),  # 紫
-    (255, 128, 128), # ピンク
-    (128, 255, 128), # ライトグリーン
-    (128, 128, 255), # ライトブルー
-    (192, 192, 192), # シルバー
-]
-
-# 色の名前（表示用）
-COLOR_NAMES = [
-    "Red", "Green", "Blue", "Yellow", 
-    "Magenta", "Cyan", "Orange", "Purple",
-    "Pink", "Light Green", "Light Blue", "Silver"
-]
+# カラー設定のインポート
+from config import BLOCK_COLORS, COLOR_NAMES
 
 # デフォルト設定
 DEFAULT_BLOCK_COUNT = 4  # ブロック数は4個固定
