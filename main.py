@@ -256,10 +256,22 @@ def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
     game_start_time = time.time()
     win_time = None
     
-    # 壁の移動用の変数
+    # 壁の移動用の変数（複数の移動壁を追加）
     start_time = pygame.time.get_ticks()
+    
+    # 上部移動壁
     wall_started = False
-    moving_wall_y = None  # 移動する壁のY座標
+    moving_wall_y = None
+    
+    # 下部水平移動壁
+    moving_wall_x = margin + BOX_SIZE//2  # 初期位置中央
+    moving_wall_dx = 2  # 移動速度
+    moving_wall_length = 100  # 壁の長さ
+    
+    # 左側振動壁
+    oscillating_wall_y = margin + BOX_SIZE//2
+    oscillating_dy = 1.5
+    oscillating_phase = 0
     
     while running:
         # 現在時間の取得
