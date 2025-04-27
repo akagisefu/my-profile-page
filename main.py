@@ -339,28 +339,29 @@ def main(record=RECORD_VIDEO, block_count=DEFAULT_BLOCK_COUNT):
         oscillating_phase = 0  # 振動壁の位相
         
         # 上部移動壁（上から下へ）
-        if elapsed_seconds >= WALL_START_TIME and not wall_started:
+        moving_wall_y = None  # デフォルト値で初期化
+        if elapsed_seconds >= 3 and not wall_started:  # 3秒後に移動開始
             wall_started = True
             wall_start_time = current_time
         
         if wall_started:
             wall_elapsed = (current_time - wall_start_time) / 1000
-            if wall_elapsed <= WALL_MOVE_DURATION:
-                progress = wall_elapsed / WALL_MOVE_DURATION
-                moving_wall_y = margin + (BOX_SIZE * progress)
-                pygame.draw.line(screen, (255, 0, 0),  # 赤色に変更
-                               (margin, moving_wall_y), 
-                               (margin + BOX_SIZE, moving_wall_y), 5)  # 太さを5に
+            progress = min(wall_elapsed / 5, 1.0)  # 最大5秒かけて移動
+            moving_wall_y = margin + (BOX_SIZE * progress)
+            pygame.draw.line(screen, (255, 0, 0),  # 赤色に変更
+                           (margin, moving_wall_y), 
+                           (margin + BOX_SIZE, moving_wall_y), 5)  # 太さを5に
                 
-                # 赤い壁との衝突判定
-                wall_rect = pygame.Rect(margin, moving_wall_y - 2, BOX_SIZE, 5)
-                for block in blocks:
-                    if block.rect.colliderect(wall_rect):
-                        block.dy = abs(block.dy)  # 下向きに反射
-                        if collision_sound:
-                            collision_sound.play()
+            # 赤い壁との衝突判定（移動終了後も壁を維持）
+            wall_rect = pygame.Rect(margin, moving_wall_y - 2, BOX_SIZE, 5)
+            for block in blocks:
+                if block.rect.colliderect(wall_rect):
+                    block.dy = abs(block.dy)  # 下向きに反射
+                    if collision_sound:
+                        collision_sound.play()
         
-        # 下部水平移動壁（左右に往復）
+        # 下部水平移動壁（左右に往復）速度向上
+        moving_wall_dx = 5  # 移動速度を2→5に
         moving_wall_x += moving_wall_dx
         if moving_wall_x < margin + 50 or moving_wall_x > margin + BOX_SIZE - 50:
             moving_wall_dx *= -1
