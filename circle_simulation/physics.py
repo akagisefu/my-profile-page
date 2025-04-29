@@ -53,25 +53,28 @@ class CircleWall:
         # Collision primarily happens at self.radius
 
     def _get_gap_boundaries(self, current_rotation_rad):
-        """Calculates the start and end angles of the gap in radians [0, 2*pi)."""
+        """Calculates the start and end angles of the gap in radians [0, 2*pi),
+           using Pygame's angle convention (0=right, positive=counter-clockwise)."""
         # Normalize rotation to [0, 2*pi)
         norm_rotation_rad = (current_rotation_rad + 2 * math.pi) % (2 * math.pi)
+        # Gap starts half-gap before rotation and ends half-gap after
         start_gap_rad = (norm_rotation_rad - self.half_gap_rad + 2 * math.pi) % (2 * math.pi)
         end_gap_rad = (norm_rotation_rad + self.half_gap_rad + 2 * math.pi) % (2 * math.pi)
         return start_gap_rad, end_gap_rad
 
     def is_inside_gap(self, angle_rad, current_rotation_rad):
-        """Checks if a given angle (radians) falls within the gap, handling angle wrapping."""
+        """Checks if a given angle (radians, Pygame convention) falls within the gap."""
         start_gap_rad, end_gap_rad = self._get_gap_boundaries(current_rotation_rad)
+        # Normalize the angle to [0, 2*pi)
         norm_angle_rad = (angle_rad + 2 * math.pi) % (2 * math.pi)
 
-        if start_gap_rad < end_gap_rad: # Gap does not wrap around 0
+        # Check if the angle is within the gap range, handling wrap-around
+        if start_gap_rad < end_gap_rad: # Gap does not wrap around 0 radians
             return start_gap_rad < norm_angle_rad < end_gap_rad
-        else: # Gap wraps around 0 (e.g., from 350 to 10 degrees)
-            # Check if angle is in the first part (start_gap to 2*pi) or second part (0 to end_gap)
+        else: # Gap wraps around 0 radians (e.g., starts at 6.0, ends at 0.5)
             return norm_angle_rad > start_gap_rad or norm_angle_rad < end_gap_rad
 
-    def collide_ball(self, ball, current_rotation_rad): # Changed parameter to radians
+    def collide_ball(self, ball, current_rotation_rad): # Parameter is radians
         """Handles collision between the wall and a ball.
         Corrects position and reflects velocity if collision occurs with solid wall.
         Returns:
@@ -88,11 +91,10 @@ class CircleWall:
 
         # Check if the ball's *outer edge* is at or beyond the collision radius
         if dist_from_center + ball.radius >= collision_radius:
-            # Calculate the angle of the ball relative to the center in radians
-            # Use standard atan2(y, x). Pygame's draw.arc uses counter-clockwise from positive x-axis.
-            ball_angle_rad = math.atan2(vec_to_ball.y, vec_to_ball.x)
+            # Calculate the angle using atan2(-y, x) for Pygame convention
+            ball_angle_rad = math.atan2(-vec_to_ball.y, vec_to_ball.x)
 
-            # Check if the ball's angle is within the gap (using radians)
+            # Check if the ball's angle is within the gap (using Pygame angle convention)
             if self.is_inside_gap(ball_angle_rad, current_rotation_rad):
                 # Ball is aligned with the gap, no collision with the solid wall
                 # Escape check (ball center > radius) is handled by is_off_screen in main.py
